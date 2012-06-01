@@ -101,3 +101,108 @@
 	((or (null src) (funcall fn (car src)))
 	 (values (nreverse acc) src))
       (push (car src) acc))))
+
+(defun most (fn lst)
+  "a combination of argmax and max on the lst, by fn"
+  (if (null lst)
+      (values nil nil)
+      (let* ((wins (car lst))
+	     (max (funcall fn wins)))
+	(dolist (obj (cdr lst))
+	  (let ((score (funcall fn obj)))
+	    (when (> score max)
+	      (setq wins obj
+		    max score))))
+	(values wins max))))
+
+(defun best (fn lst)
+  "if fn defines a total order on the elements of lst, returns the greatest element"
+  (if (null lst)
+      nil
+      (let ((wins (car lst)))
+	(dolist (obj (cdr lst))
+	  (if (funcall fn obj wins)
+	      (setq wins obj)))
+	wins)))
+
+(defun mostn (fn lst)
+  "like most but will return a list of all objects with max score instead
+of the first found"
+  (if (null lst)
+      (values nil nil)
+      (let ((max (funcall fn (car lst)))
+	    (wins (list (car lst))))
+	(dolist (obj (cdr lst))
+	  (let ((score (funcall fn obj)))
+	  (cond ((> score max ) (setq max score
+				      wins (list obj)))
+		((= score max) (push obj wins)))))
+	(values (nreverse wins) max))))
+
+(defun mapa-b (fn a b &optional (step 1))
+  "map fn on values between a and b, inclusive, separated by step"
+  (do* ((i a (+ i step))
+	(acc nil (cons (funcall fn i) acc)))
+       ((>= i b) (nreverse acc))))
+
+(defun map0-n (fn n)
+  "map fn on values from 0 to n inclusive"
+  (mapa-b fn 0 n))
+
+(defun map1-n (fn n)
+  "map fn on values from 1 to n inclusive"
+  (mapa-b fn 1 n))
+
+(defun map-> (fn start test-fn succ-fn)
+  "in haskell:
+   map fn $ takeWhile (not . test-fn) $ iterate fn start"
+  (do ((i start (funcall succ-fn i))
+       (result nil))
+      ((funcall test-fn i) (nreverse result))
+    (push (funcall fn i) result)))
+
+(defun mappend (fn &rest lsts)
+  "a non-destructive mapcan"
+  (apply #'append (apply #'mapcar fn lsts)))
+
+(defun mapcars (fn &rest lsts)
+  "fewer processor cycles but more bytes consed than graham's"
+  (mappend (lambda (lst) (mapcar fn lst)) lsts))
+
+(defun mapcars-grahams (fn &rest lsts)
+  (let ((result nil))
+    (dolist (lst lsts)
+      (dolist (obj lst)
+	(push (funcall fn obj) result)))
+    (nreverse result)))
+
+(defun rmapcar (fn &rest args)
+  "mapcar for trees"
+  (if (some #'atom args)
+      (apply fn args)
+      (apply #'mapcar
+	     #'(lambda (&rest args)
+		 (apply #'rmapcar fn args))
+	     args)))
+
+;;; I/O Functions
+(defun readlist (&rest args)
+  "calls read-line with the specified args, wraps what's returned in a list"
+  (values (read-from-string
+	   (concatenate 'string "("
+			(apply #'read-line args)
+			")"))))
+
+(defun prompt (&rest args)
+  "ex: (prompt \"Enter a number between ~a and ~a. ~%>> \" 1 10)"
+  (apply #'format *query-io* args)
+  (read *query-io*))
+
+(defun break-loop (fn quit &rest args)
+  "emulate the top-level. apply fn to each input, terminate if (quit input)"
+  (format *query-io* "Entering break-loop. ~%")
+  (loop
+       (let ((in (apply #'prompt args)))
+	 (if (funcall quit in)
+	     (return)
+	     (format *query-io* "~A~%" (funcall fn in))))))
