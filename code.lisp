@@ -206,3 +206,78 @@ of the first found"
 	 (if (funcall quit in)
 	     (return)
 	     (format *query-io* "~A~%" (funcall fn in))))))
+
+;;; 4.7 Symbols and Strings
+(defun mkstr (&rest args)
+  "make a string out of the args"
+  (with-output-to-string (s)
+    (dolist (a args) (princ a s))))
+
+(defun symb (&rest args)
+  " this will be handy for macros"
+  (values (intern (apply #'mkstr args))))
+
+(defun reread (&rest args)
+  "takes a series of objects, prints and rereads them"
+  (values (read-from-string (apply #'mkstr args))))
+
+(defun explode (sym)
+  "(explode 'bomb) -> '(B O M B)"
+  (map 'list #'(lambda (c)
+		 (intern (make-string 1
+				      :initial-element c)))
+       (symbol-name sym)))
+
+;;; Destructive equivalents
+(defvar *!equivs* (make-hash-table))
+
+(defun ! (fn)
+  (or (gethash fn *!equivs*) fn))
+
+(defun def! (fn fn!)
+  (setf (gethash fn *!equivs*) fn!))
+
+;;; returning functions
+(defun memoize (fn)
+  (let ((cache (make-hash-table :test #'equal)))
+    #'(lambda (&rest args)
+	(multiple-value-bind (val win) (gethash args cache)
+	  (if win
+	      val
+	      (setf (gethash args cache)
+		    (apply fn args)))))))
+
+(defun compose (&rest fns)
+  (if fns
+      (let ((fn1 (car (last fns)))
+	    (fns (butlast fns)))
+	#'(lambda (&rest args)
+	    (reduce #'funcall fns
+		    :from-end t
+		    :initial-value (apply fn1 args))))
+      #'identity))
+
+(defun fif (if then &optional else)
+  "functional if statement"
+  #'(lambda (x)
+      (if (funcall if x)
+	  (funcall then x)
+	  (if else (funcall else x)))))
+
+(defun fint (fn &rest fns)
+  "intersection of predicates
+  (fint #'p #'q #'r) == (lambda (x) (and (p x) (q x) (r x)))"
+  (if (null fns)
+      fn
+      (let ((chain (apply #'fint fns)))
+	#'(lambda (x)
+	    (and (funcall fn x) (funcall chain x))))))
+
+(defun fun (fn &rest fns)
+  "union of predicates
+   (fun #'p #'q #'r) == (lambda (x) (or (p x) (q x) (r x)))"
+  (if (null fns)
+      fn
+      (let ((chain (apply #'fun fns)))
+	      #'(lambda (x)
+		  (or (funcall fn x) (funcall chain x))))))
