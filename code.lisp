@@ -281,3 +281,38 @@ of the first found"
       (let ((chain (apply #'fun fns)))
 	      #'(lambda (x)
 		  (or (funcall fn x) (funcall chain x))))))
+
+(defun lrec (rec &optional base)
+  "return a function to perform conditional cdr recursion
+   typically not-tail recursive
+   rec should take two args: 
+       first is each item of the list
+       second is the result of the tail recursion"
+  (labels ((self (lst)
+	     (if (null lst)
+		 (if (functionp base)
+		     (funcall base)
+		     base)
+		 (funcall rec (car lst)
+			  #'(lambda ()
+			      (self (cdr lst)))))))
+    #'self))
+
+;; lrec examples
+
+; every, for some function fn
+; (lrec #'(lambda (x f) (and (funcall fn x) (funcall f))) t)
+
+; copy-list
+; (lrec #'(lambda (x f) (cons x (funcall f))))
+
+; remove-duplicates
+; (lrec #'(lambda (x f) (adjoin x (funcall f))))
+
+; find-if, for some function fn
+;(lrec #'(lambda (x f) (if (fn x) x (funcall f))))
+
+; some, for some function fn
+; (lrec #'(lambda (x f) (or (fn x) (funcall f))))
+
+;;; sub-tree recursion
