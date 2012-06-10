@@ -316,3 +316,37 @@ of the first found"
 ; (lrec #'(lambda (x f) (or (fn x) (funcall f))))
 
 ;;; sub-tree recursion
+(defun ttrav (rec &optional (base #'identity))
+  "general tree traversal, eager"
+  ; copy-tree (ttrav #'cons) 
+  ; count-leaves (ttrav #'(lambda (l r) (+ l (or r 1))) 1)
+  ; flatten (ttrav #'nconc #'mklist)
+  (labels ((self (tree)
+	     (if (atom tree)
+		 (if (functionp base)
+		     (funcall base tree)
+		     base)
+		 (funcall rec (self (car tree))
+			  (if (cdr tree)
+			      (self (cdr tree)))))))
+    #'self))
+
+(defun trec (rec &optional (base #'identity))
+  "general tree traversal, lazy-ish. rec should take three arguments: the current tree and two recursers, for left and right branches respectively"
+  ; flatten : (trec #'(lambda (o l r) (nconc (funcall l) (funcall r))) #'mklist)
+  ; rfind-if, given function fn :
+  ; (trec #'(lambda (o l r) (or (funcall l) (funcall r)))
+  ;       #'(lambda (tree) (and (funcall fn tree) tree)))
+  (labels ((self (tree)
+	     (if (atom tree)
+		 (if (functionp base)
+		     (funcall base tree)
+		     base)
+		 (funcall rec tree
+			  #'(lambda () (self (car tree)))
+			  #'(lambda () (self (cdr tree)))))))
+    #'self))
+	     
+
+
+	   
