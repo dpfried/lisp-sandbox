@@ -346,7 +346,52 @@ of the first found"
 			  #'(lambda () (self (car tree)))
 			  #'(lambda () (self (cdr tree)))))))
     #'self))
-	     
 
+;;; Macros
+(defmacro nif (expr pos zero neg)
+  "numerical if. Returns pos, zero, or neg depending on the sign of expr"
+  (let ((g (gensym)))
+    `(let ((,g ,expr))
+       (cond ((plusp ,g) ,pos)
+	     ((zerop ,g) ,zero)
+	     (t ,neg)))))
 
-	   
+(defmacro while (test &body body)
+  `(do ()
+       ((not ,test))
+     ,@body))
+
+(defmacro mac (expr)
+  "print out the first macroexpansion of expr, shortcut for quoting"
+  `(pprint (macroexpand-1 ',expr)))
+
+(defmacro our-dolist ((var list &optional result) &body body)
+  `(progn
+     (mapc #'(lambda (,var) ,@body)
+	   ,list)
+     (let ((,var nil))
+       ,result)))
+
+(defmacro when-bind ((var expr) &body body)
+  "ex (when-bind (input (get-user-input))
+         (process input))"
+  `(let ((,var ,expr))
+     (when ,var
+       ,@body)))
+
+(defmacro our-expander (name) `(get ,name 'expander))
+
+(defmacro our-defmacro (name params &body body)
+  (let ((g (gensym)))
+    `(progn
+       (setf (our-expander ',name)
+	     #'(lambda (,g)
+		 (block ,name
+		   (destructuring-bind ,params ,g
+		     ,@body))))
+       ',name)))
+
+(defun our-macroexpand-1 (expr)
+  (if (and (consp expr) (our-expander (car expr)))
+      (funcall (our-expander (car expr)) (cdr expr))
+      expr))
